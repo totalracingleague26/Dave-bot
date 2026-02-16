@@ -2,13 +2,12 @@ import discord
 import asyncio
 from discord.ext import commands
 from discord.ui import Button, View, Select
-import google.generativeai as genai
+from google.genai import Client
+import os
 
 # =============================
 # CONFIG
 # =============================
-import os
-
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
@@ -21,7 +20,7 @@ STEWARD_ROLE_ID = 1471995325857402951
 # =============================
 # AI SETUP (GEMINI)
 # =============================
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = Client(api_key=GEMINI_API_KEY)
 
 def load_rules():
     try:
@@ -71,9 +70,9 @@ League rules reference:
 def ask_dave(user_message, ticket_type="General"):
     try:
         system_prompt = get_dave_system_prompt(ticket_type)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(
-            f"{system_prompt}\n\nUser: {user_message}"
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=f"{system_prompt}\n\nUser: {user_message}"
         )
         return response.text
     except Exception as e:
@@ -106,7 +105,7 @@ def get_ticket_colour(ticket_type):
     elif ticket_type == "Feedback":
         return discord.Color.green()
     else:
-        return discord.Color.blurple()  # General
+        return discord.Color.blurple()
 
 # =============================
 # SUMMARY SYSTEM
@@ -118,33 +117,11 @@ async def get_ticket_messages(channel):
             messages.append(f"{msg.author.display_name}: {msg.content}")
     return "\n".join(messages)
 
-def get_summary_prompt(ticket_type, transcript):
-    if ticket_type == "Incident":
-        style = "Write a short steward-style incident report."
-    elif ticket_type == "Report":
-        style = "Write a short moderation alert."
-    elif ticket_type == "Feedback":
-        style = "Summarise this feedback suggestion."
-    else:
-        style = "Summarise the question and answer."
-
-    return f"""
-You are Dave, TRL Ticket Assistant.
-
-{style}
-
-Keep it short and professional.
-
-Transcript:
-{transcript}
-"""
-
 def generate_summary(ticket_type, transcript):
     try:
-        prompt = get_summary_prompt(ticket_type, transcript)
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=prompt
+            contents=f"Summarise this {ticket_type} ticket:\n{transcript}"
         )
         return response.text
     except Exception as e:
@@ -260,18 +237,9 @@ class ClaimButton(Button):
 # =============================
 async def start_timer(channel):
     try:
-        total_seconds = 259200
-        message = ticket_messages.get(channel.id)
-        if not message:
-            return
-
-        while total_seconds > 0:
-            await asyncio.sleep(60)
-            total_seconds -= 60
-
+        await asyncio.sleep(259200)  # 3 days
         await log_ticket_summary(channel)
         await channel.delete()
-
     except:
         pass
 
@@ -342,7 +310,7 @@ class TicketSelect(Select):
 
         embed.add_field(
             name="Auto-Close Timer",
-            value="🕒 Closes in: **3d 0h 0m**",
+            value="🕒 Closes in: **3 days**",
             inline=False
         )
 
