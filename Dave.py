@@ -2,7 +2,7 @@ import discord
 import asyncio
 from discord.ext import commands
 from discord.ui import Button, View, Select
-from google import genai
+import google.generativeai as genai
 
 # =============================
 # CONFIG
@@ -71,9 +71,9 @@ League rules reference:
 def ask_dave(user_message, ticket_type="General"):
     try:
         system_prompt = get_dave_system_prompt(ticket_type)
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=f"{system_prompt}\n\nUser: {user_message}"
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(
+            f"{system_prompt}\n\nUser: {user_message}"
         )
         return response.text
     except Exception as e:
